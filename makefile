@@ -1,3 +1,5 @@
+#git commit -m "" --author="Ivan Galban Smith <i.galban@lab.matcom.uh.cu>"
+
 .SUFFIXES:
 
 .SUFFIXES: .c .o
@@ -9,7 +11,7 @@ OBJDEPENDS = head.o
 EXECFLAGS = -pthread -o
 
 warehouse: $(OBJDEPENDS)
-	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/$(OBJDEPENDS)
+	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o
 
 .c.o:
 	$(CC) $(OBJLAGS) build/$@ $<

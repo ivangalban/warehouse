@@ -20,7 +20,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
 #define LISTENQ  1024  /* second argument to listen() */
 
 typedef struct sockaddr SA;
@@ -38,7 +37,4 @@ int Accept(int s, struct sockaddr *addr, socklen_t *addrlen);
 int open_clientfd(char *hostname, int portno);
 int open_listenfd(int portno);
 
-/*Client/server function*/
-int Open_clientfd(char *hostname, int port);
-int Open_listenfd(int port);
-
+void init(int argc, char **argv);

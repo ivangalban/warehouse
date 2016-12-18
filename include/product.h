@@ -6,3 +6,12 @@ typedef struct {
     char product_type[3];    // tipo de producto generado
     char product_data[4084];  // esto es solo para que todos los productos tengan 4096 bytes de tamaño 
 } product;
+
+typedef struct {
+	char *type;
+	int limit;
+	int first;
+	int last;
+	sem_t slots_available;
+	product *products;
+} product_package;

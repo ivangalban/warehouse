@@ -13,6 +13,9 @@ EXECFLAGS = -pthread -o
 warehouse: $(OBJDEPENDS)
 	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o
 
+producer: $(OBJDEPENDS)
+	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o	
+
 .c.o:
 	$(CC) $(OBJLAGS) build/$@ $<
 

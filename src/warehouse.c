@@ -1,4 +1,3 @@
-#include "../include/head.h"
 #include "../include/warehouse.h"
 
 int limit, total_slots_available, port;

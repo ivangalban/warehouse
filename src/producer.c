@@ -1,5 +1,4 @@
-#include "../include/head.h"
-#include "../include/product.h"
+#include "../include/producer.h"
 
 int *warehouses;
 
@@ -83,96 +82,87 @@ void checkinit()
     }
 }
 
-
-void *produce1(void *vargp)
+void make_item(int item)
 {
-    printf("sdd\n");
-
-    pthread_detach(pthread_self());
-    while(1)
+    for (int j = 0; j < production[item].limit; ++j)
     {
-             
-            for (int i = 0; i < total_products; ++i)
-                for (int j = 0; j < production[i].limit; ++j)
-                    p(&production[i].slots_available);
+        strncpy(production[item].products[j].product_type,production[item].type,3);
         
+        p(&id_product_mutex);
         
-        for (int i = 0; i < total_products; ++i)
-        {
+        id_product++;
+        production[item].products[j].product_id=id_product;
+        
+        v(&id_product_mutex);
 
-           for (int j = 0; j < production[i].limit; ++j)
-           {
-                strncpy(production[i].products[j].product_type,production[i].type,3);
-                
-                p(&id_product_mutex);
-                
-                id_product++;
-                production[i].products[j].product_id=id_product;
-                
-                v(&id_product_mutex);
-
-                
-                printf("%d\n",j);
-
-                printf("New product: id----->%d   type-----> %s\n",
-                            id_product,production[i].type );
-
-           }
-        }
        
-        sleep(1);
+        printf("New product: id----->%d   type-----> %s\n",
+                        id_product,production[item].type);
     }
 }
 
 void *produce_item(void *vargp)
 {
     int item = *((int *) vargp);
-    pthread_detach(pthread_self());
+   
     // free(vargp);
     while(1)
     {
         for (int j = 0; j < production[item].limit; ++j)
             p(&production[item].slots_available);
-           
-        for (int j = 0; j < production[item].limit; ++j)
-            {
-                strncpy(production[item].products[j].product_type,production[item].type,3);
-                
-                p(&id_product_mutex);
-                
-                id_product++;
-                production[item].products[j].product_id=id_product;
-                
-                v(&id_product_mutex);
-
-               
-                printf("New product: id----->%d   type-----> %s\n",
-                                id_product,production[item].type);
-            }
+        
+        make_item(item);     
+      
         sleep(1);
     }
 }
 
-void *produce2(void *vargp)
+void *produce1(void *vargp) /*tmp*/
 {
-    pthread_detach(pthread_self());
-    for (int i = 0; i < total_products; ++i)
+    while(1)
     {
-        pthread_t id;
-        int *item=(int*)malloc(sizeof(int));
-        *item=i;
-        printf("%d\n",*item );
-        pthread_create(&id,NULL,produce_item, item);
+         
+        for (int i = 0; i < total_products; ++i)
+            for (int j = 0; j < production[i].limit; ++j)
+                p(&production[i].slots_available);
+        
+        
+        for (int i = 0; i < total_products; ++i)
+               make_item(i);
+             
+        sleep(1);
     }
 }
 
+void *produce2(void *vargp) /*tmp*/
+{
+    pthread_t *id=(pthread_t*)malloc(total_products*sizeof(pthread_t));
+    for (int i = 0; i < total_products; ++i)
+    {
+        int *item=(int*)malloc(sizeof(int));
+        *item=i;
+        pthread_create(&id[i],NULL,produce_item, item);
+    }
+    for (int i = 0; i < total_products; ++i)
+    {
+        pthread_join(id[i],NULL);
+    }
+}
+ 
+void *produce(void *vargp)
+{
+    produce1(vargp);
+}
 
 int main(int argc, char **argv) 
 {
     init(argc,argv);
     //checkinit();
-    pthread_t id;
-    pthread_create(&id,NULL,produce1,NULL);
-    while(1);
+    pthread_t producer_id;
+    pthread_create(&producer_id,NULL,produce,NULL);
+    
+
+    pthread_join(producer_id,NULL);
+    return 0;
 }
 

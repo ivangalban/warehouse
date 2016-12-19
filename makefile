@@ -16,6 +16,9 @@ warehouse: $(OBJDEPENDS)
 producer: $(OBJDEPENDS)
 	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o	
 
+consumer: $(OBJDEPENDS)
+	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o	
+
 .c.o:
 	$(CC) $(OBJLAGS) build/$@ $<
 

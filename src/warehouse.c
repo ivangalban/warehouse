@@ -3,7 +3,7 @@
 int limit, total_slots_available, port;
 product_package *product_types;
 int product_types_size;
-
+int unknowntype=0;
 void check_init()
 {
     printf("port------->%d\n",port );
@@ -31,10 +31,11 @@ void init(int argc ,char **argv)
 
     port=atoi(argv[1]);
 
+
     if(strchr(argv[2],':')==NULL)
     {
+        unknowntype=1;
         limit=atoi(argv[2]);
-        index=3;
     }
 
     //there are types
@@ -46,6 +47,10 @@ void init(int argc ,char **argv)
 
     for (int i=0; index < argc; ++index,++i)
     {
+        if(unknowntype&&i==0)
+        {
+            product_types.type=0;
+        }
         product_types[i].type=strtok(argv[index],":");
         if(strlen(product_types[i].type)>3)
         {
@@ -61,23 +66,7 @@ void init(int argc ,char **argv)
     
 }
 
-int main(int argc, char **argv)
-{
-    int listenfd, *connfd, port;
-    struct sockaddr_in clientaddr;
-    init(argc,argv);
-    check_init();
-    listenfd = open_listenfd(port);
-    socklen_t clientlen = sizeof(clientaddr);
-    pthread_t tid;
-    while (1) {
 
-        connfd=malloc(sizeof(int));
-        *connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-        pthread_create(&tid,NULL,thread,connfd);
-    }
-    exit(0);
-}
 
 void *thread(void *vargp) 
 {  
@@ -97,10 +86,32 @@ void *thread(void *vargp)
 
 void producer_service(int connfd)
 {
-
+    while(1)
+    {
+        recv(connfd)
+    }
 }
 
 void consumer_service(int connfd)
 {
 
+}
+
+
+int main(int argc, char **argv)
+{
+    int listenfd, *connfd, port;
+    struct sockaddr_in clientaddr;
+    init(argc,argv);
+    check_init();
+    listenfd = open_listenfd(port);
+    socklen_t clientlen = sizeof(clientaddr);
+    pthread_t tid;
+    while (1) {
+
+        connfd=malloc(sizeof(int));
+        *connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+        pthread_create(&tid,NULL,thread,connfd);
+    }
+    exit(0);
 }

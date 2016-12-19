@@ -10,8 +10,8 @@ typedef struct {
 typedef struct {
 	char *type;
 	int limit;
-	int first;
-	int last;
+	int current;
 	sem_t slots_available;
+	sem_t slots_busy;
 	product *products;
 } product_package;

@@ -52,6 +52,13 @@ void init(int argc ,char **argv)
         {
             sem_init(&warehouses_mutex[index],0,1);
             warehouses[index]=open_clientfd(tmp_str,tmp_int);
+
+            printf("------------------->%d\n",warehouses[index] );
+            
+            char buff[10]="producer";
+            printf("%d\n",strlen(buff) );
+            printf("%s\n",buff );
+            send(warehouses[index],buff,strlen(buff),0);
             ++index;
         }
     }
@@ -62,8 +69,7 @@ void init(int argc ,char **argv)
         prouction=(product_package*)malloc(total_products*sizeof(product_package));
         prouction[0].products=(product*)malloc(sizeof(product));
         prouction[0].type=(char*)malloc(3*sizeof(char));
-        prouction[0].type[0]='X';
-        prouction[0].type[1]=0;
+        sprintf(prouction[0].type,"X");
         prouction[0].limit=1;
         sem_init(&prouction[0].slots_available,0,1);
         sem_init(&prouction[0].slots_busy,0,0);

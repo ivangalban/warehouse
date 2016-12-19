@@ -49,6 +49,9 @@ void init(int argc ,char **argv)
         {
             sem_init(&warehouses_mutex[index],0,1);
             warehouses[index]=open_clientfd(tmp_str,tmp_int);
+            char *buff="consumer";
+            send(warehouses[index],buff,strlen(buff),0);
+
             ++index;
         }
     }
@@ -58,10 +61,7 @@ void init(int argc ,char **argv)
         total_products++;
         taken=(product_package*)malloc(total_products*sizeof(product_package));
         taken[0].type=(char*)malloc(5*sizeof(char));
-        taken[0].type[0]='a';
-        taken[0].type[1]='u';
-        taken[0].type[2]='t';
-        taken[0].type[3]='o';
+        sprintf(taken[0].type,"auto");
         taken[0].limit=1;
         taken[0].products=(product*)malloc(sizeof(product));
         taken[0].limit=1;
@@ -94,7 +94,8 @@ void *receive_item(void *vargp)
                 count++;
             }
         }
-            v(&warehouses_mutex[i]);
+        
+        v(&warehouses_mutex[i]);
 
     }
 }

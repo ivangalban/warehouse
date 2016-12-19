@@ -10,17 +10,20 @@ OBJLAGS =  -pthread -c -o
 OBJDEPENDS = head.o
 EXECFLAGS = -pthread -o
 
+all: warehouse producer consumer
+
+
 warehouse: $(OBJDEPENDS)
-	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o
+	$(CC) $(EXECFLAGS) bin/$@ src/$@.c  build/head.o
 
 producer: $(OBJDEPENDS)
-	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o	
+	$(CC) $(EXECFLAGS) bin/$@ src/$@.c  build/head.o	
 
 consumer: $(OBJDEPENDS)
-	$(CC) $(EXECFLAGS) exec/$@ src/$@.c  build/head.o	
+	$(CC) $(EXECFLAGS) bin/$@ src/$@.c  build/head.o	
 
 .c.o:
 	$(CC) $(OBJLAGS) build/$@ $<
 
 clean:
-	rm build/* exec/*
+	rm build/* bin/*

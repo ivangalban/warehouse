@@ -13,5 +13,6 @@ typedef struct {
 	int current;
 	sem_t slots_available;
 	sem_t slots_busy;
+	sem_t mutex;
 	product *products;
 } product_package;

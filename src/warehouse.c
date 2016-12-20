@@ -16,15 +16,13 @@ void print_status()
     sem_getvalue(&product_types[0].slots_busy, &count);
     printf("Amount of products------> %d\n",  count);
     sem_getvalue(&product_types[0].slots_available, &count);
-    
-
     printf("Slots available------> %d\n\n",  count);
     for (int i = 1; i < product_types_size; ++i)
     {
-        p(&product_types[i].mutex);
+       
         sem_getvalue(&product_types[i].slots_busy, &count);
         printf("Number of products of type:%s ------> %d\n", product_types[i].type, count);
-        v(&product_types[i].mutex);
+
     }
     printf("\n*************************************\n");
 
@@ -60,7 +58,13 @@ void init(int argc ,char **argv)
    
     for (int i=1; index < argc; ++index,++i)
     {
-        product_types[i].type=strtok(argv[index],":");
+       
+        product_types[i].type=(char*)malloc(5*sizeof(char));
+        for (int j = 0; j < 5; ++j)
+            product_types[i].type[j]=0;
+        char *tmp=strtok(argv[index],":");
+        sprintf(product_types[i].type,"%s",tmp);
+
         if(strlen(product_types[i].type)>3)
         {
             unix_error("incorrect type name");
@@ -69,7 +73,6 @@ void init(int argc ,char **argv)
         sem_init(&product_types[i].slots_available,0,product_types[i].limit);
         sem_init(&product_types[i].slots_busy,0,0);
         sem_init(&product_types[i].mutex,0,1);
-
         tmp_limit+=product_types[i].limit;
     }
 
@@ -84,13 +87,14 @@ void init(int argc ,char **argv)
     //printf("%d\n",limit );
 
 
-    sprintf(product_types[0].type,"item");
+    sprintf(product_types[0].type,"item\0");
     
 
     sem_init(&product_types[0].slots_available,0,limit);
     sem_init(&product_types[0].slots_busy,0,0);
     sem_init(&product_types[0].mutex,0,1);
     sem_init(&buffer_mutex,0,1);
+    
     for (int i = 0; i < limit; ++i)
         buffer[i].product_id=-1;
 }
@@ -103,7 +107,7 @@ void *thread(void *vargp)
     pthread_detach(pthread_self()); 
     free(vargp);                  
    
-    char buff[50];
+    char buff[10];
     recv(connfd, buff, sizeof(buff), 0); 
     if(strncmp("producer",buff,8)==0)
         producer_service(connfd);
@@ -112,101 +116,96 @@ void *thread(void *vargp)
     close(connfd);
     return NULL;
 }
-char okmessage[6]="OK";
-char nomessage[6]="NO";
+char okmessage[6]="OK\0";
+char nomessage[6]="NO\0";
 
 void get_item(int connfd,int pos)
 {
     // printf("sadsdsad\n");
-    if(pos!=0)
-        p(&product_types[pos].slots_available);
-
-    p(&product_types[0].slots_available);
-    
-    send(connfd,okmessage,strlen(okmessage),0);
+    int index;
 
     p(&buffer_mutex);
     
-    int index;
-
     for (index = 0; index < limit; ++index)
     {
         if(buffer[index].product_id==-1)
             break;
     }
 
-
     recv(connfd,&buffer[index],sizeof(product),0);
     
-    printf("***product****\n%s  %d   %s\n********\n",buffer[index].provider_id,buffer[index].product_id,buffer[index].product_type);
-
     v(&buffer_mutex);
 
-    v(&product_types[0].slots_busy);
 
+    printf("***product****\n%s  %d   %s\n********\n",buffer[index].provider_id,buffer[index].product_id,buffer[index].product_type);
+
+
+    p(&product_types[0].slots_available);
+    
     if(pos!=0)
+    {
+        p(&product_types[pos].slots_available);
         v(&product_types[pos].slots_busy);
+    }
 
+    v(&product_types[0].slots_busy);
    
-     print_status();
+      print_status();
 }
 
 void producer_service(int connfd)
 {
-    char buff[10];
+    char buff[5];
     int k=0;
+    
     while(1)
     {
+        for (int i = 0; i < 5; ++i)
+        {
+            buff[i]=0;
+        }
         
-        recv(connfd,buff,10,0); 
         int found=0;
-        int count;
+        int count=1;
         int limit_count=1;
-        for(int i=product_types_size-1; i>=0;--i)
+        recv(connfd,buff,5,0); 
+        int index;
+       
+        for(index=product_types_size-1; index>0;--index)
+            if(strncmp(buff,product_types[index].type,3)==0)
+                break;
+         
+        if(index!=0)
         {
-            
 
-            if(strcmp(buff,product_types[i].type)==0)
-            {
+            p(&product_types[index].mutex);
 
-                if(i!=0)
-                p(&product_types[i].mutex);
+            sem_getvalue(&product_types[index].slots_available,&count); 
+        }  
+
+        p(&product_types[0].mutex);
+                       
+        sem_getvalue(&product_types[0].slots_available,&limit_count);
                
-                found==1;
-
-                sem_getvalue(&product_types[i].slots_available,&count);
-                
-                sem_getvalue(&product_types[0].slots_available,&limit_count);
-
-                if(count > 0 && limit_count>0)
-                {
-                    get_item(connfd,i);
-                    break;
-                }
-                else
-                {
-                     send(connfd,nomessage,strlen(nomessage),0);
-                     break;
-                }
-
-                if(i!=0)
-                v(&product_types[i].mutex);
-            }
-           
-        }
-        
-        if(found==0 && unknowntype==1)
+        if(count > 0 && limit_count>0)
         {
+            send(connfd,okmessage,strlen(okmessage),0);
+            
+            get_item(connfd,index);
+        }    
+        else
+        {
+            send(connfd,nomessage,strlen(nomessage),0);
+        }    
+        
+        v(&product_types[0].mutex);
 
-            sem_getvalue(&product_types[0].slots_available,&limit_count);
-          
-            if(limit_count>0)
-                get_item(connfd,0);
-            else
-                send(connfd,nomessage,strlen(nomessage),0);
-        }
+        if(index!=0)
+            v(&product_types[index].mutex);   
+
     }
 }
+
 
 void consumer_service(int connfd)
 {
@@ -219,20 +218,6 @@ int main(int argc, char **argv)
 
      init(argc,argv);
 
-    // int listenfd, *connfd, port;
-    // struct sockaddr_in clientaddr;
-   
-    // listenfd = open_listenfd(port);
-    // socklen_t clientlen = sizeof(clientaddr);
-    // pthread_t tid;
-    // while (1) {
-    //     printf("asasasas\n");
-    //     connfd=malloc(sizeof(int));
-    //     *connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-    //     pthread_create(&tid,NULL,thread,connfd);
-    // }
-    // exit(0);
-
     int listenfd, *connfdp;
     socklen_t clientlen=sizeof(struct sockaddr_in);
     struct sockaddr_in clientaddr;
@@ -242,8 +227,8 @@ int main(int argc, char **argv)
     listenfd = open_listenfd(port);
     while (1) {
 
-    connfdp = malloc(sizeof(int)); //line:conc:echoservert:beginmalloc
-    *connfdp = Accept(listenfd, (SA *) &clientaddr, &clientlen); //line:conc:echoservert:endmalloc
+    connfdp = malloc(sizeof(int)); 
+    *connfdp = Accept(listenfd, (SA *) &clientaddr, &clientlen);
    
 
      pthread_create(&tid, NULL, thread, connfdp);

@@ -44,7 +44,7 @@ void init(int argc ,char **argv)
         {
             prouction[i-1].products=(product*)malloc(tmp_int*sizeof(product));
             prouction[i-1].type=tmp_str;
-            strcat(prouction[i-1].type,"\n\0");
+            strcat(prouction[i-1].type,"\0");
             prouction[i-1].limit=tmp_int;
             sem_init(&prouction[i-1].slots_available,0,tmp_int);
             sem_init(&prouction[i-1].slots_busy,0,0);
@@ -56,9 +56,7 @@ void init(int argc ,char **argv)
 
             printf("------------------->%d\n",warehouses[index] );
             
-            char buff[10]="producer\n\0";
-            printf("%d\n",strlen(buff) );
-            printf("%s\n",buff );
+            char buff[10]="producer\0";
             send(warehouses[index],buff,strlen(buff),0);
             ++index;
         }
@@ -70,7 +68,7 @@ void init(int argc ,char **argv)
         prouction=(product_package*)malloc(total_products*sizeof(product_package));
         prouction[0].products=(product*)malloc(sizeof(product));
         prouction[0].type=(char*)malloc(3*sizeof(char));
-        sprintf(prouction[0].type,"X\n\0");
+        sprintf(prouction[0].type,"X\0");
         prouction[0].limit=1;
         sem_init(&prouction[0].slots_available,0,1);
         sem_init(&prouction[0].slots_busy,0,0);
@@ -190,15 +188,12 @@ void *store_item(void *vargp)
 
         if((warehouses[i]!=-1)&&(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1))
         {
-            // printf("ssssseeeeeeennnnnnndddddd1\n");
             send(warehouses[i],prouction[item].type,strlen(prouction[item].type),0);
             recv(warehouses[i],msg,5,0);
             if(strncmp(msg,"OK",2)==0)
             {
-                int name = warehouses[i]%1000;
+                int name = warehouses[i]%100;
                 sprintf(prouction[item].products[prouction[item].current].provider_id,"%d",name);
-                printf("ssssseeeeeeennnnnnndddddd2\n");
-                
                 send(warehouses[i],&prouction[item].products[prouction[item].current],sizeof(product),0);
                 prouction[item].current++;
                 v(&prouction[item].slots_available);

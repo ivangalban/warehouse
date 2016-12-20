@@ -9,9 +9,18 @@ int total_warehouse=0;
 int total_products=0;
 int id_product=0;
 sem_t id_product_mutex;
+char producer_id[5];
+
+struct sockaddr_in clientaddr;
+socklen_t clientlen = sizeof(clientaddr);
 
 void init(int argc ,char **argv)
 { 
+    producer_id[0]=mrand();
+    producer_id[1]=mrand();
+    producer_id[2]=mrand();
+    producer_id[3]=0;
+    
     for (int i = 1; i < argc; ++i)
     {
         char *p;
@@ -174,9 +183,6 @@ void *produce(void *vargp)
 void *store_item(void *vargp)
 {
     int item=*((int*)vargp);
-
-    struct sockaddr_in clientaddr;
-    socklen_t clientlen = sizeof(clientaddr);
     char msg[5];
     for (int i = 0; ; ++i)
     {
@@ -192,8 +198,7 @@ void *store_item(void *vargp)
             recv(warehouses[i],msg,5,0);
             if(strncmp(msg,"OK",2)==0)
             {
-                int name = warehouses[i]%100;
-                sprintf(prouction[item].products[prouction[item].current].provider_id,"%d",name);
+                sprintf(prouction[item].products[prouction[item].current].provider_id,"%s",producer_id);
                 send(warehouses[i],&prouction[item].products[prouction[item].current],sizeof(product),0);
                 prouction[item].current++;
                 v(&prouction[item].slots_available);
@@ -232,15 +237,15 @@ int main(int argc, char **argv)
 {
     init(argc,argv);
     //checkinit();
-    pthread_t producer_id;
-    pthread_create(&producer_id,NULL,produce,NULL);
+    pthread_t producer_tid;
+    pthread_create(&producer_tid,NULL,produce,NULL);
   
-    pthread_t store_id;
-    pthread_create(&store_id,NULL,store,NULL);
+    pthread_t store_tid;
+    pthread_create(&store_tid,NULL,store,NULL);
     
 
-    pthread_join(producer_id,NULL);
-    pthread_join(store_id,NULL);
+    pthread_join(producer_tid,NULL);
+    pthread_join(store_tid,NULL);
     return 0;
 }
 

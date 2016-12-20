@@ -37,4 +37,7 @@ int Accept(int s, struct sockaddr *addr, socklen_t *addrlen);
 int open_clientfd(char *hostname, int portno);
 int open_listenfd(int portno);
 
+char mrand();
+
 void init(int argc, char **argv);
+

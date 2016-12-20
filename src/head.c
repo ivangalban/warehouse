@@ -105,4 +105,21 @@ int open_listenfd(int port)
 	return -1;
     return listenfd;
 }
-/* $end open_listenfd */
+
+char mrand()
+{
+    struct timeval tim;
+    gettimeofday(&tim,NULL);
+    int seed=(tim.tv_sec*tim.tv_usec);
+    if(seed<0)
+        seed*=-1;
+   
+    srand((unsigned int)seed);
+    char ret;
+    if(seed&1)
+        ret = (char)('A'+rand()%26);
+    else
+        ret = (char)('0'+rand()%10);
+    printf("%c\n",ret );
+    return ret;
+}

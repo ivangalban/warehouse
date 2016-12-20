@@ -8,9 +8,19 @@ product_package *taken;
 int total_warehouse=0;
 int total_products=0;
 
+struct sockaddr_in clientaddr;
+socklen_t clientlen = sizeof(clientaddr);
+
+
+
 
 void init(int argc ,char **argv)
 { 
+   
+
+
+
+
     for (int i = 1; i < argc; ++i)
     {
         char *p;
@@ -42,14 +52,17 @@ void init(int argc ,char **argv)
         if(i<=total_products)
         {
             taken[i-1].products=(product*)malloc(tmp_int*sizeof(product));
-            taken[i-1].type=tmp_str;
-            taken[i-1].limit=tmp_int;
+            prouction[i-1].type=tmp_str;
+            strcat(prouction[i-1].type,"\0");
+            prouction[i-1].limit=tmp_int;
+            sem_init(&prouction[i-1].slots_available,0,tmp_int);
+            sem_init(&prouction[i-1].slots_busy,0,0);
         }
         else
         {
             sem_init(&warehouses_mutex[index],0,1);
             warehouses[index]=open_clientfd(tmp_str,tmp_int);
-            char *buff="consumer";
+            char *buff="consumer\0";
             send(warehouses[index],buff,strlen(buff),0);
 
             ++index;
@@ -60,11 +73,12 @@ void init(int argc ,char **argv)
     {
         total_products++;
         taken=(product_package*)malloc(total_products*sizeof(product_package));
-        taken[0].type=(char*)malloc(5*sizeof(char));
-        sprintf(taken[0].type,"auto");
-        taken[0].limit=1;
         taken[0].products=(product*)malloc(sizeof(product));
+        taken[0].type=(char*)malloc(3*sizeof(char));
+        sprintf(production[0].type,"auto\0");
         taken[0].limit=1;
+        sem_init(&taken[0].slots_available,0,1);
+        sem_init(&taken[0].slots_busy,0,0);
     }
 }
 
@@ -72,15 +86,16 @@ void *receive_item(void *vargp)
 {
     int item=*((int*)vargp);
 
-    struct sockaddr_in clientaddr;
-    socklen_t clientlen = sizeof(clientaddr);
+
     char msg[3];
     int count=0;
+
     for (int i = 0; count<taken[item].limit ; ++i)
     {
         if(i>=total_warehouse)
             i=0;
-            p(&warehouses_mutex[i]);
+       
+        p(&warehouses_mutex[i]);
 
         if((warehouses[i]!=-1)&&(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1))
         {
@@ -127,13 +142,13 @@ int main(int argc, char **argv)
     init(argc,argv);
    
     pthread_t *id=(pthread_t*)malloc(total_products*sizeof(pthread_t));
+    int *items=(int*)malloc(total_products*sizeof(int));
     while(1)
     {
         for (int i = 0; i < total_products; ++i)
         {
-            int *item=(int*)malloc(sizeof(int));
-            *item=i;
-            pthread_create(&id[i],NULL,receive_item, item);
+            item[i]=i;
+            pthread_create(&id[i],NULL,receive_item, item+i);
         }
         
         for (int i = 0; i < total_products; ++i)

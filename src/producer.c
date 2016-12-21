@@ -3,7 +3,7 @@
 int *warehouses;
 sem_t *warehouses_mutex;
 
-product_package *prouction;
+product_package *production;
 
 int total_warehouse=0;
 int total_products=0;
@@ -20,7 +20,7 @@ void init(int argc ,char **argv)
     producer_id[1]=mrand();
     producer_id[2]=mrand();
     producer_id[3]=0;
-    
+
     for (int i = 1; i < argc; ++i)
     {
         char *p;
@@ -39,7 +39,7 @@ void init(int argc ,char **argv)
     warehouses=(int*)malloc(total_warehouse*sizeof(int));
     warehouses_mutex=(sem_t*)malloc(total_warehouse*sizeof(sem_t));
     if(total_products>0)
-        prouction=(product_package*)malloc(total_products*sizeof(product_package));
+        production=(product_package*)malloc(total_products*sizeof(product_package));
 
     int index=0;
 
@@ -51,22 +51,19 @@ void init(int argc ,char **argv)
 
         if(i<=total_products)
         {
-            prouction[i-1].products=(product*)malloc(tmp_int*sizeof(product));
-            prouction[i-1].type=tmp_str;
-            strcat(prouction[i-1].type,"\0");
-            prouction[i-1].limit=tmp_int;
-            sem_init(&prouction[i-1].slots_available,0,tmp_int);
-            sem_init(&prouction[i-1].slots_busy,0,0);
+            production[i-1].products=(product*)malloc(tmp_int*sizeof(product));
+            production[i-1].type=tmp_str;
+            strcat(production[i-1].type,"\0");
+            production[i-1].limit=tmp_int;
+            sem_init(&production[i-1].slots_available,0,tmp_int);
+            sem_init(&production[i-1].slots_busy,0,0);
         }
         else
         {
             sem_init(&warehouses_mutex[index],0,1);
-            warehouses[index]=open_clientfd(tmp_str,tmp_int);
-
-            printf("------------------->%d\n",warehouses[index] );
-            
-            char buff[10]="producer\0";
-            send(warehouses[index],buff,strlen(buff),0);
+            warehouses[index]=open_clientfd(tmp_str,tmp_int);            
+            char *buff="producer\0";
+            write(warehouses[index],buff,strlen(buff));
             ++index;
         }
     }
@@ -74,13 +71,13 @@ void init(int argc ,char **argv)
     if(total_products==0)
     {
         total_products++;
-        prouction=(product_package*)malloc(total_products*sizeof(product_package));
-        prouction[0].products=(product*)malloc(sizeof(product));
-        prouction[0].type=(char*)malloc(3*sizeof(char));
-        sprintf(prouction[0].type,"X\0");
-        prouction[0].limit=1;
-        sem_init(&prouction[0].slots_available,0,1);
-        sem_init(&prouction[0].slots_busy,0,0);
+        production=(product_package*)malloc(total_products*sizeof(product_package));
+        production[0].products=(product*)malloc(sizeof(product));
+        production[0].type=(char*)malloc(3*sizeof(char));
+        sprintf(production[0].type,"X\0");
+        production[0].limit=1;
+        sem_init(&production[0].slots_available,0,1);
+        sem_init(&production[0].slots_busy,0,0);
     }
 
     sem_init(&id_product_mutex,0,1);
@@ -96,29 +93,29 @@ void checkinit()
     printf("%d\n",total_products );
     for (int i = 0; i < total_products; ++i)
     {
-        printf("type---------->%s    ",prouction[i].type);
-        printf("limit---------->%d\n",prouction[i].limit);
+        printf("type---------->%s    ",production[i].type);
+        printf("limit---------->%d\n",production[i].limit);
     }
 }
 
 void make_item(int item)
 {
-    for (int j = 0; j < prouction[item].limit; ++j)
+    for (int j = 0; j < production[item].limit; ++j)
     {
-        strncpy(prouction[item].products[j].product_type,prouction[item].type,3);
+        strncpy(production[item].products[j].product_type,production[item].type,3);
         
         p(&id_product_mutex);
         
         id_product++;
-        prouction[item].products[j].product_id=id_product;
+        production[item].products[j].product_id=id_product;
         
         v(&id_product_mutex);
 
        
         printf("New product: id----->%d   type-----> %s\n",
-                        id_product,prouction[item].type);
+                        id_product,production[item].type);
     }
-    prouction[item].current=0;
+    production[item].current=0;
 }
 
 void *produce_item(void *vargp)
@@ -128,13 +125,13 @@ void *produce_item(void *vargp)
     // free(vargp);
     while(1)
     {
-        for (int j = 0; j < prouction[item].limit; ++j)
-            p(&prouction[item].slots_available);
+        for (int j = 0; j < production[item].limit; ++j)
+            p(&production[item].slots_available);
         
         make_item(item);     
         
-         for (int j = 0; j < prouction[item].limit; ++j)
-            v(&prouction[item].slots_busy);
+         for (int j = 0; j < production[item].limit; ++j)
+            v(&production[item].slots_busy);
         
         sleep(1);
     }
@@ -146,16 +143,16 @@ void *produce1(void *vargp) /*tmp*/
     {
          
         for (int i = 0; i < total_products; ++i)
-            for (int j = 0; j < prouction[i].limit; ++j)
-                p(&prouction[i].slots_available);
+            for (int j = 0; j < production[i].limit; ++j)
+                p(&production[i].slots_available);
         
         
         for (int i = 0; i < total_products; ++i)
                make_item(i);
        
          for (int i = 0; i < total_products; ++i)
-            for (int j = 0; j < prouction[i].limit; ++j)
-                v(&prouction[i].slots_busy);      
+            for (int j = 0; j < production[i].limit; ++j)
+                v(&production[i].slots_busy);      
         sleep(1);
     }
 }
@@ -189,28 +186,28 @@ void *store_item(void *vargp)
     
         if(i>=total_warehouse)
             i=0;
-        p(&prouction[item].slots_busy);
+        p(&production[item].slots_busy);
         p(&warehouses_mutex[i]);
 
         if((warehouses[i]!=-1)&&(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1))
         {
-            send(warehouses[i],prouction[item].type,strlen(prouction[item].type),0);
-            recv(warehouses[i],msg,5,0);
+            write(warehouses[i],production[item].type,strlen(production[item].type));
+            read(warehouses[i],msg,5);
             if(strncmp(msg,"OK",2)==0)
             {
-                sprintf(prouction[item].products[prouction[item].current].provider_id,"%s",producer_id);
-                send(warehouses[i],&prouction[item].products[prouction[item].current],sizeof(product),0);
-                prouction[item].current++;
-                v(&prouction[item].slots_available);
+                sprintf(production[item].products[production[item].current].provider_id,"%s",producer_id);
+                write(warehouses[i],&production[item].products[production[item].current],sizeof(product));
+                production[item].current++;
+                v(&production[item].slots_available);
             }
             else
             {
-                v(&prouction[item].slots_busy);
+                v(&production[item].slots_busy);
             }
         }
         else
         {
-              v(&prouction[item].slots_busy);
+              v(&production[item].slots_busy);
         }
             v(&warehouses_mutex[i]);
         

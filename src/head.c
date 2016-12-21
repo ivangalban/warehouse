@@ -120,6 +120,6 @@ char mrand()
         ret = (char)('A'+rand()%26);
     else
         ret = (char)('0'+rand()%10);
-    printf("%c\n",ret );
+
     return ret;
 }

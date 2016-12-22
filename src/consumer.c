@@ -123,15 +123,12 @@ void *receive_item(void *vargp)
                 //count++;
 
                 void *p=malloc(10*sizeof(product));
-                char s[20];
-                read(warehouses[i],s,10*sizeof(char));
                 read(warehouses[i],p,10*sizeof(product));
 
                 prd[0]=*((product*)p);
-                printf("%s\n",s );
                 printf("Provider--------------->%s\n", prd->provider_id);
                 printf("Product_ID------------->%d\n", prd->product_id);
-               printf("Product_type----------->%s\n", prd->product_type);
+                printf("Product_type----------->%s\n", prd->product_type);
                 
                 count++;
             }
@@ -147,7 +144,6 @@ void *receive_item(void *vargp)
 int main(int argc, char **argv) 
 {
     init(argc,argv);
-   printf("%s\n","aaaaaaa" );
     pthread_t *id=(pthread_t*)malloc(total_products*sizeof(pthread_t));
     int *items=(int*)malloc(total_products*sizeof(int));
     while(1)

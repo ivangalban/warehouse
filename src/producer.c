@@ -84,20 +84,6 @@ void init(int argc ,char **argv)
 
 }
 
-void checkinit()
-{
-    for (int i = 0; i < total_warehouse; ++i)
-    {
-        printf("warehouses-------->%d    \n",warehouses[i]);
-    }
-    printf("%d\n",total_products );
-    for (int i = 0; i < total_products; ++i)
-    {
-        printf("type---------->%s    ",production[i].type);
-        printf("limit---------->%d\n",production[i].limit);
-    }
-}
-
 void make_item(int item)
 {
     for (int j = 0; j < production[item].limit; ++j)

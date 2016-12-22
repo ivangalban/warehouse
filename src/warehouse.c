@@ -69,7 +69,6 @@ void init(int argc ,char **argv)
         product_types[i].limit=atoi(strtok(NULL,":"));
         sem_init(&product_types[i].slots_available,0,product_types[i].limit);
         sem_init(&product_types[i].slots_busy,0,0);
-        sem_init(&product_types[i].mutex,0,1);
         tmp_limit+=product_types[i].limit;
     }
 
@@ -89,7 +88,6 @@ void init(int argc ,char **argv)
 
     sem_init(&product_types[0].slots_available,0,limit);
     sem_init(&product_types[0].slots_busy,0,0);
-    sem_init(&product_types[0].mutex,0,1);
     sem_init(&buffer_mutex,0,1);
     
     for (int i = 0; i < limit; ++i)
@@ -111,59 +109,93 @@ void *thread(void *vargp)
         producer_service(connfd);
     else if(strncmp("consumer",buff,8)==0)
         consumer_service(connfd);
-
+        printf("asdasdsd\n");
     close(connfd);
     return NULL;
 }
 char okmessage[6]="OK\0";
 char nomessage[6]="NO\0";
 
-void get_item(int connfd,int pos)
-{
-    // printf("sadsdsad\n");
-    int index;
-
-    p(&buffer_mutex);
-    
-    for (index = 0; index < limit; ++index)
-    {
-        if(buffer[index].product_id==-1)
-            break;
-    }
-
-    read(connfd,&buffer[index],sizeof(product));
-    
-    v(&buffer_mutex);
-
-
-    // printf("***in product****\n%s  %d   %s\n********\n",buffer[index].provider_id,buffer[index].product_id,buffer[index].product_type);
-
-
-    p(&product_types[0].slots_available);
-    
-    if(pos!=0)
-    {
-        p(&product_types[pos].slots_available);
-        v(&product_types[pos].slots_busy);
-    }
-
-    v(&product_types[0].slots_busy);
-   
-    print_status();
-}
-
 void producer_service(int connfd)
 {
     char buff[5];
 
     struct sockaddr_in clientaddr;
+    
     socklen_t clientlen = sizeof(clientaddr);
     
     while(1)
     {
+        for (int i = 0; i < 5; ++i)
+        {
+            buff[i]=0;
+        }
+        
+        
+        
+        read(connfd,buff,5); 
 
-        if(getpeername(connfd,(SA *)&clientaddr, &clientlen)==-1)
-            break;
+        int count=1;
+       
+        int limit_count=1;
+        
+        p(&buffer_mutex);
+      
+        int index_type;
+        int index_product;
+
+        for(index_type=product_types_size-1; index_type>0;--index_type)
+            if(strncmp(buff,product_types[index_type].type,3)==0)
+                break;
+         
+        if(index_type!=0)
+        {
+            sem_getvalue(&product_types[index_type].slots_available,&count); 
+        }  
+
+        sem_getvalue(&product_types[0].slots_available,&limit_count);
+               
+        if(count > 0 && limit_count>0)
+        {
+            write(connfd,okmessage,strlen(okmessage)+1);
+
+            for (index_product = 0; index_product < limit; ++index_product)
+            {
+                if(buffer[index_product].product_id==-1)
+                    break;
+            }
+
+            read(connfd,&buffer[index_product],sizeof(product));
+            
+            if(index_type!=0)
+            {
+                p(&product_types[index_type].slots_available);
+                v(&product_types[index_type].slots_busy);
+            }
+           
+            p(&product_types[0].slots_available);
+            v(&product_types[0].slots_busy);
+             print_status();
+            printf("in\n");
+
+        }    
+        else
+            write(connfd,nomessage,strlen(nomessage)+1);
+        
+        v(&buffer_mutex);
+    }
+}
+
+void consumer_service(int connfd)
+{
+   char buff[5];
+
+    struct sockaddr_in clientaddr;
+    
+    socklen_t clientlen = sizeof(clientaddr);
+    
+    while(1)
+    {
 
         for (int i = 0; i < 5; ++i)
         {
@@ -171,127 +203,58 @@ void producer_service(int connfd)
         }
         
         int count=1;
-        int limit_count=1;
-        read(connfd,buff,5); 
-        int index;
        
-        for(index=product_types_size-1; index>0;--index)
-            if(strncmp(buff,product_types[index].type,3)==0)
+        int limit_count=1;
+        
+        read(connfd,buff,5); 
+        
+        p(&buffer_mutex);
+      
+        int index_type;
+        int index_product;
+
+        for(index_type=product_types_size-1; index_type>0;--index_type)
+            if(strncmp(buff,product_types[index_type].type,3)==0)
                 break;
          
-        if(index!=0)
+        if(index_type!=0)
         {
-
-            p(&product_types[index].mutex);
-
-            sem_getvalue(&product_types[index].slots_available,&count); 
+            sem_getvalue(&product_types[index_type].slots_busy,&count); 
         }  
 
-        p(&product_types[0].mutex);
-                       
-        sem_getvalue(&product_types[0].slots_available,&limit_count);
+        sem_getvalue(&product_types[0].slots_busy,&limit_count);
                
         if(count > 0 && limit_count>0)
         {
             write(connfd,okmessage,strlen(okmessage)+1);
+
+            int is_auto=strncmp(buff,"auto",4);
+            for (index_product = 0; index_product < limit; ++index_product)
+            {
+                if(buffer[index_product].product_id!=-1 && 
+                    (is_auto || strncmp(buff,buffer[index_product].product_type,3)))
+                    break;
+            }
+
+            write(connfd,&buffer[index_product],sizeof(product));
+            buffer[index_product].product_id=-1;
+            if(index_type!=0)
+            {
+                v(&product_types[index_type].slots_available);
+                p(&product_types[index_type].slots_busy);
+            }
+           
+            v(&product_types[0].slots_available);
+            p(&product_types[0].slots_busy);
             
-            get_item(connfd,index);
+            print_status();
+            printf("out\n");
+            
         }    
         else
-        {
             write(connfd,nomessage,strlen(nomessage)+1);
-        }    
-        
-        v(&product_types[0].mutex);
-
-        if(index!=0)
-            v(&product_types[index].mutex);   
-
-    }
-}
-char producr1[20];
-char producr2[20];
-char producr3[20];
-
-void consumer_service(int connfd)
-{
-    char buff[5];
-    struct sockaddr_in clientaddr;
-    socklen_t clientlen = sizeof(clientaddr);
-
-    while(1)
-    {
-        // if(getpeername(connfd,(SA *)&clientaddr, &clientlen)==-1)
-        //     break;
-
-        for (int i = 0; i < 5; ++i)
-            buff[i]=0;
-
-        read(connfd,buff,5); 
-       
-        int index_product,index_type;
-       
-        int is_auto=0;
-
-        is_auto=(strncmp(buff,"auto",4)==0);
-        p(&buffer_mutex);
-       
-        for(index_product=0; index_product<limit; ++index_product)
-            if((buffer[index_product].product_id!=-1) && (is_auto || strncmp(buff,buffer[index_product].product_type,3)==0))
-                break;
-       
-        if(index_product==limit)
-        {
-            write(connfd,nomessage, strlen(nomessage)+1);
-            v(&buffer_mutex);
-            continue;
-        }
-       
-      
-        
-        // for(index_type=product_types_size-1; index_type>0;--index_type)
-        // {
-            
-        //     p(&product_types[index_type].mutex);
-        //     if(strcmp(buff,product_types[index_type].type)==0)
-        //         break;
-        //     else
-        //     {
-        //         v(&product_types[index_type].mutex);
-        //     }
-           
-        // }
-        
-        write(connfd,okmessage, strlen(okmessage)+1);
-        // v(&product_types[0].mutex);
-  
-        void *c=&buffer[index_product];
-        product *d=(product*)c;
-        printf("Product\n");
-        printf("%s\n",d->provider_id);
-        printf("%d\n",d->product_id);
-        printf("%s\n",d->product_type);
-        write(connfd,"\nProduct\0",10);
-        write(connfd,d,sizeof(product));
-
-        buffer[index_product].product_id=-1;
-
-        v(&product_types[0].slots_available);
-        p(&product_types[0].slots_busy);
-        print_status();
         
         v(&buffer_mutex);
-
-       
-        // if(index_type!=0)
-        // {   
-        //     v(&product_types[index_type].slots_available);
-        //     p(&product_types[index_type].slots_busy); 
-        //     v(&product_types[index_type].mutex);
-        // }
-        // v(&product_types[0].mutex);
-
-
     }
 }
 
@@ -299,7 +262,7 @@ void consumer_service(int connfd)
 int main(int argc, char **argv)
 {
 
-     init(argc,argv);
+      init(argc,argv);
 
     int listenfd, *connfdp;
     socklen_t clientlen=sizeof(struct sockaddr_in);
@@ -316,4 +279,5 @@ int main(int argc, char **argv)
 
      pthread_create(&tid, NULL, thread, connfdp);
     }
+
 }

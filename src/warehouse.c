@@ -234,77 +234,64 @@ void consumer_service(int connfd)
         int is_auto=0;
 
         is_auto=(strncmp(buff,"auto",4)==0);
-      
+        p(&buffer_mutex);
+       
         for(index_product=0; index_product<limit; ++index_product)
             if((buffer[index_product].product_id!=-1) && (is_auto || strncmp(buff,buffer[index_product].product_type,3)==0))
                 break;
-      
+       
         if(index_product==limit)
         {
             write(connfd,nomessage, strlen(nomessage)+1);
+            v(&buffer_mutex);
             continue;
         }
        
       
         
-        for(index_type=product_types_size-1; index_type>0;--index_type)
-        {
+        // for(index_type=product_types_size-1; index_type>0;--index_type)
+        // {
             
-            p(&product_types[index_type].mutex);
-            if(strcmp(buff,product_types[index_type].type)==0)
-                break;
-            else
-            {
-                v(&product_types[index_type].mutex);
-            }
+        //     p(&product_types[index_type].mutex);
+        //     if(strcmp(buff,product_types[index_type].type)==0)
+        //         break;
+        //     else
+        //     {
+        //         v(&product_types[index_type].mutex);
+        //     }
            
-        }
+        // }
         
         write(connfd,okmessage, strlen(okmessage)+1);
-        v(&product_types[0].mutex);
-        p(&buffer_mutex);
-         
-
-        
-
-        // sprintf(producr1,"%s\0",buffer[index_product].provider_id);
-        // sprintf(producr2,"%d\0",buffer[index_product].product_id);
-        // sprintf(producr3,"%s\0",buffer[index_product].product_type);
-        // printf("%s\n",producr1 );
-        // printf("%s\n",producr2 );
-        // printf("%s\n",producr3 );
-      
-        // write(connfd,producr1,20);
-        // write(connfd,producr2,20);
-        // write(connfd,producr3,20);
-        // write(connfd,producr,100); 
-            void *c=&buffer[index_product];
-            product *d=(product*)c;
-            printf("Product\n");
-            printf("%s\n",d->provider_id);
-            printf("%d\n",d->product_id);
-            printf("%s\n",d->product_type);
-         write(connfd,"\nProduct\0",10);
-         write(connfd,d,sizeof(product));
-         // write(connfd,&buffer[index_product],sizeof(product));
-         // send(connfd,&buffer[index_product],sizeof(product),0);
+        // v(&product_types[0].mutex);
+  
+        void *c=&buffer[index_product];
+        product *d=(product*)c;
+        printf("Product\n");
+        printf("%s\n",d->provider_id);
+        printf("%d\n",d->product_id);
+        printf("%s\n",d->product_type);
+        write(connfd,"\nProduct\0",10);
+        write(connfd,d,sizeof(product));
 
         buffer[index_product].product_id=-1;
-        v(&buffer_mutex);
 
         v(&product_types[0].slots_available);
         p(&product_types[0].slots_busy);
-
-        if(index_type!=0)
-        {   
-            v(&product_types[index_type].slots_available);
-            p(&product_types[index_type].slots_busy); 
-            v(&product_types[index_type].mutex);
-        }
-        v(&product_types[0].mutex);
-
-
         print_status();
+        
+        v(&buffer_mutex);
+
+       
+        // if(index_type!=0)
+        // {   
+        //     v(&product_types[index_type].slots_available);
+        //     p(&product_types[index_type].slots_busy); 
+        //     v(&product_types[index_type].mutex);
+        // }
+        // v(&product_types[0].mutex);
+
+
     }
 }
 

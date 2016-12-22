@@ -81,9 +81,6 @@ void init(int argc ,char **argv)
 
     product_types[0].type=(char*)malloc(10*sizeof(char));
    
-    //printf("%d\n",limit );
-
-
     sprintf(product_types[0].type,"auto\0");
     
 
@@ -106,6 +103,7 @@ void *thread(void *vargp)
     char buff[10];
 
     read(connfd, buff, 10); 
+  
     if(strcmp("producer\0",buff)==0)
         producer_service(connfd);
     else if(strcmp("consumer\0",buff)==0)
@@ -138,22 +136,18 @@ void producer_service(int connfd)
         int index_type;
         int index_product;
 
+
         for(index_type=product_types_size-1; index_type>0;--index_type)
             if(strcmp(buff,product_types[index_type].type)==0)
                 break;
-
+       
         if(index_type!=0)
-        {
             sem_getvalue(&product_types[index_type].slots_available,&count);
-        }  
 
         sem_getvalue(&product_types[0].slots_available,&limit_count);
-               
+
         if(count > 0 && limit_count>0 && (accept_auto||index_type>0))
         {
-            // printf("!!!!!!!!%d  %d\n",index_type,product_types_size ); 
-            // printf("%s  %s\n",buff,product_types[0].type );
-            // printf("%s  %s\n",buff,product_types[1].type );
 
             write(connfd,okmessage,10);
 
@@ -164,7 +158,7 @@ void producer_service(int connfd)
             }
             
             read(connfd,&buffer[index_product],sizeof(product));
-            
+
 
             if(index_type!=0)
             {
@@ -174,9 +168,7 @@ void producer_service(int connfd)
            
             p(&product_types[0].slots_available);
             v(&product_types[0].slots_busy);
-             print_status();
-             printf("in\n");
-
+            print_status();
         }    
         else
         {
@@ -224,14 +216,22 @@ void consumer_service(int connfd)
         if(count > 0 && limit_count>0 && (is_auto||index_type>0))
         {
             write(connfd,okmessage,10);
+         
             for (index_product = 0; index_product < limit; ++index_product)
             {
-                if(buffer[index_product].product_id!=-1 && 
-                    (is_auto || strcmp(buff,buffer[index_product].product_type)))
-                    break;
+                if(buffer[index_product].product_id !=-1 && 
+                    (is_auto || strcmp(buff,buffer[index_product].product_type)==0))
+                        break;
             }
+
+            if(is_auto)
+            {
+                 for(index_type=product_types_size-1; index_type>0;--index_type)
+                    if(strcmp(buffer[index_product].product_type,product_types[index_type].type)==0)
+                        break;
+            }
+   
             write(connfd,&buffer[index_product],sizeof(product));
-            buffer[index_product].product_id=-1;
             if(index_type!=0)
             {
                 v(&product_types[index_type].slots_available);
@@ -243,6 +243,7 @@ void consumer_service(int connfd)
             
             print_status();
             printf("out\n");
+            buffer[index_product].product_id=-1;
 
         }    
         else
@@ -271,7 +272,6 @@ int main(int argc, char **argv)
 
     connfdp = malloc(sizeof(int)); 
     *connfdp = Accept(listenfd, (SA *) &clientaddr, &clientlen);
-   
 
      pthread_create(&tid, NULL, thread, connfdp);
     }

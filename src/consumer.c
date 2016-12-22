@@ -106,12 +106,11 @@ void *receive_item(void *vargp)
             
             if(strcmp(msg,"OK\0")==0)
             {
-                printf("%s\n",msg );
                 product prd[1];
                 read(warehouses[i],prd,sizeof(product));
                 printf("Provider--------------->%s\n", prd[0].provider_id);
                 printf("Product_ID------------->%d\n", prd[0].product_id);
-                printf("Product_type----------->%s\n", prd[0].product_type);
+                printf("Product_type----------->%s\n\n", prd[0].product_type);
                 
                 count++;
             }

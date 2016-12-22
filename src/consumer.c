@@ -58,7 +58,8 @@ void init(int argc ,char **argv)
         { 
             warehouses[index]=open_clientfd(tmp_str,tmp_int);
             char buff[10]="consumer\0";
-            write(warehouses[index],buff,10);
+            if(getpeername(warehouses[index],(SA *)&clientaddr, &clientlen)!=-1)
+                write(warehouses[index],buff,10);
             ++index;
         }
     }
@@ -100,14 +101,31 @@ void *receive_item(void *vargp)
         {
             char buff[10];
             sprintf(buff,types[item]);
-            write(warehouses[i],buff,10);
+            if(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1)
+                write(warehouses[i],buff,10);
+            else
+            {
+                v(&warehouses_mutex);
+                continue;
+            }
             
-            read(warehouses[i],msg,10);         
-            
+            if(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1)
+                read(warehouses[i],msg,10);         
+            else
+            {
+                v(&warehouses_mutex);
+                continue;
+            }
             if(strcmp(msg,"OK\0")==0)
             {
                 product prd[1];
-                read(warehouses[i],prd,sizeof(product));
+                if(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1)
+                    read(warehouses[i],prd,sizeof(product));
+                else 
+                {
+                    v(&warehouses_mutex);
+                    continue;
+                }
                 printf("Provider--------------->%s\n", prd[0].provider_id);
                 printf("Product_ID------------->%d\n", prd[0].product_id);
                 printf("Product_type----------->%s\n\n", prd[0].product_type);

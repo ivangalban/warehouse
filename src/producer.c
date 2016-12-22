@@ -66,7 +66,10 @@ void init(int argc ,char **argv)
            
             sprintf(buff,"producer\0");
          
-            write(warehouses[index],buff,10);
+
+            if(getpeername(warehouses[index],(SA *)&clientaddr, &clientlen)!=-1)
+                write(warehouses[index],buff,10);
+          
             ++index;
         }
     }
@@ -162,12 +165,36 @@ void *store_item(void *vargp)
         if((warehouses[i]!=-1)&&(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1))
         {
             sprintf(msg,"%s\0",production[item].type);
-            write(warehouses[i],msg,10);
-            read(warehouses[i],msg,10);
+
+            if(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1)
+                write(warehouses[i],msg,10);
+            else
+            {
+                v(&production[item].slots_busy);
+                v(&warehouses_mutex[i]);
+                continue;
+            }
+
+            if(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1)
+                read(warehouses[i],msg,10);
+            else
+            {
+                v(&production[item].slots_busy);
+                v(&warehouses_mutex[i]);
+                continue;
+            }
+            
             if(strcmp(msg,"OK\0")==0)
             {
                 sprintf(production[item].products[production[item].current].provider_id,"%s",producer_id);
-                write(warehouses[i],&production[item].products[production[item].current],sizeof(product));
+                if(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1)
+                    write(warehouses[i],&production[item].products[production[item].current],sizeof(product));
+                else
+                {
+                    v(&production[item].slots_busy);
+                    v(&warehouses_mutex[i]);
+                    continue;
+                }
                 production[item].current++;
                 v(&production[item].slots_available);
             }

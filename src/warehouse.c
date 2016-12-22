@@ -7,6 +7,13 @@ sem_t buffer_mutex;
 int product_types_size;
 int id_producer=1;
 int accept_auto=0;
+
+struct sockaddr_in clientaddr;
+    
+socklen_t clientlen = sizeof(clientaddr);
+
+
+
 void print_status()
 {
 
@@ -102,7 +109,13 @@ void *thread(void *vargp)
    
     char buff[10];
 
-    read(connfd, buff, 10); 
+    if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+        read(connfd, buff, 10); 
+    else
+    {
+        close(connfd);
+        return NULL;
+    }
   
     if(strcmp("producer\0",buff)==0)
         producer_service(connfd);
@@ -118,14 +131,13 @@ void producer_service(int connfd)
 {
     char buff[10];
 
-    struct sockaddr_in clientaddr;
-    
-    socklen_t clientlen = sizeof(clientaddr);
+
     
     while(1)
     {
-        
-        read(connfd,buff,10);
+        if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+            read(connfd,buff,10);
+        else return;
 
         int count=1;
        
@@ -148,16 +160,26 @@ void producer_service(int connfd)
 
         if(count > 0 && limit_count>0 && (accept_auto||index_type>0))
         {
-
-            write(connfd,okmessage,10);
+            if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+                write(connfd,okmessage,10);
+            else
+            {
+                v(&buffer_mutex);
+                return;
+            }
 
             for (index_product = 0; index_product < limit; ++index_product)
             {
                 if(buffer[index_product].product_id==-1)
                     break;
             }
-            
-            read(connfd,&buffer[index_product],sizeof(product));
+            if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+                read(connfd,&buffer[index_product],sizeof(product));
+            else
+            {
+                v(&buffer_mutex);
+                return;
+            }
 
 
             if(index_type!=0)
@@ -168,11 +190,18 @@ void producer_service(int connfd)
            
             p(&product_types[0].slots_available);
             v(&product_types[0].slots_busy);
+
             print_status();
         }    
         else
         {
-            write(connfd,nomessage,10);
+            if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+                write(connfd,nomessage,10);
+            else
+            {
+                v(&buffer_mutex);
+                return;
+            }
         }
         
         v(&buffer_mutex);
@@ -182,16 +211,14 @@ void producer_service(int connfd)
 void consumer_service(int connfd)
 {
    char buff[10];
-
-    struct sockaddr_in clientaddr;
-    
-    socklen_t clientlen = sizeof(clientaddr);
     
     while(1)
     {
+        if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+            read(connfd,buff,10); 
+        else
+            return;  
 
-        read(connfd,buff,10); 
-        
         int count=1;
        
         int limit_count=1;
@@ -201,37 +228,36 @@ void consumer_service(int connfd)
         int index_type;
         int index_product;
 
-        for(index_type=product_types_size-1; index_type>0;--index_type)
-            if(strcmp(buff,product_types[index_type].type)==0)
-                break;
-         
-        if(index_type!=0)
-        {
-            sem_getvalue(&product_types[index_type].slots_busy,&count); 
-        }  
-
-        sem_getvalue(&product_types[0].slots_busy,&limit_count);
         int is_auto=(strcmp(buff,"auto\0")==0);  
 
-        if(count > 0 && limit_count>0 && (is_auto||index_type>0))
+        for (index_product = 0; index_product < limit; ++index_product)
         {
-            write(connfd,okmessage,10);
+            if(buffer[index_product].product_id !=-1 && 
+                (is_auto || strcmp(buff,buffer[index_product].product_type)==0))
+                    break;
+        }
          
-            for (index_product = 0; index_product < limit; ++index_product)
+        if(index_product<limit)
+        {
+            if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+                write(connfd,okmessage,10);
+            else
             {
-                if(buffer[index_product].product_id !=-1 && 
-                    (is_auto || strcmp(buff,buffer[index_product].product_type)==0))
-                        break;
+                v(&buffer_mutex);
+                return;
+            }
+            for(index_type=product_types_size-1; index_type>0;--index_type)
+                if(strcmp(buffer[index_product].product_type,product_types[index_type].type)==0)
+                    break;
+
+            if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+                write(connfd,&buffer[index_product],sizeof(product));
+            else
+            {
+                v(&buffer_mutex);
+                return;
             }
 
-            if(is_auto)
-            {
-                 for(index_type=product_types_size-1; index_type>0;--index_type)
-                    if(strcmp(buffer[index_product].product_type,product_types[index_type].type)==0)
-                        break;
-            }
-   
-            write(connfd,&buffer[index_product],sizeof(product));
             if(index_type!=0)
             {
                 v(&product_types[index_type].slots_available);
@@ -248,7 +274,13 @@ void consumer_service(int connfd)
         }    
         else
         {
-            write(connfd,nomessage,10);
+            if(getpeername(connfd,(SA *)&clientaddr, &clientlen)!=-1)
+                write(connfd,nomessage,10);
+            else
+            {
+                v(&buffer_mutex);
+                return;
+            }
         }
         
         v(&buffer_mutex);
@@ -262,8 +294,8 @@ int main(int argc, char **argv)
       init(argc,argv);
 
     int listenfd, *connfdp;
-    socklen_t clientlen=sizeof(struct sockaddr_in);
-    struct sockaddr_in clientaddr;
+
+    
     pthread_t tid; 
 
 

@@ -1,7 +1,7 @@
 #include "../include/consumer.h"
 
 int *warehouses;
-sem_t *warehouses_mutex;
+sem_t warehouses_mutex;
 
 int total_warehouse=0;
 int total_products=0;
@@ -15,6 +15,8 @@ socklen_t clientlen = sizeof(clientaddr);
 
 void init(int argc ,char **argv)
 { 
+            sem_init(&warehouses_mutex,0,1);
+
     for (int i = 1; i < argc; ++i)
     {
         char *p;
@@ -31,7 +33,7 @@ void init(int argc ,char **argv)
     }
 
     warehouses=(int*)malloc(total_warehouse*sizeof(int));
-    warehouses_mutex=(sem_t*)malloc(total_warehouse*sizeof(sem_t));
+    // warehouses_mutex=(sem_t*)malloc(total_warehouse*sizeof(sem_t));
     if(total_products>0)
     {
         types=(char**)malloc(total_products*sizeof(char*));
@@ -54,10 +56,9 @@ void init(int argc ,char **argv)
         }
         else
         { 
-            sem_init(&warehouses_mutex[index],0,1);
             warehouses[index]=open_clientfd(tmp_str,tmp_int);
-            char *buff="consumer\0";
-            send(warehouses[index],buff,strlen(buff),0);
+            char buff[10]="consumer\0";
+            write(warehouses[index],buff,10);
             ++index;
         }
     }
@@ -79,62 +80,44 @@ void init(int argc ,char **argv)
 
 
 
-product prd[1];
-
 void *receive_item(void *vargp)
 {
    
     int item=*((int*)vargp);
 
-
-    char msg[6];
-    char msg1[20];
-    char msg2[20];
-    char msg3[20];
-
     int count=0;
 
-
-   
     for (int i = 0; count<limit[item] ; ++i)
     {
         
         if(i>=total_warehouse)
             i=0;
        
-        p(&warehouses_mutex[i]);
-
+        p(&warehouses_mutex);
+        char msg[10];
+        
         if((warehouses[i]!=-1)&&(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1))
         {
-            write(warehouses[i],types[item],strlen(types[item])+1);
-            read(warehouses[i],msg,6);         
+            char buff[10];
+            sprintf(buff,types[item]);
+            write(warehouses[i],buff,10);
             
-            if(strncmp(msg,"OK",2)==0)
+            read(warehouses[i],msg,10);         
+            
+            if(strcmp(msg,"OK\0")==0)
             {
-                // printf("blblb\n");
-
-            // read(warehouses[i],msg1,20);
-            // read(warehouses[i],msg2,20);
-            // read(warehouses[i],msg3,20);
-            //     printf("Provider--------------->%s\n", msg1);
-            //     printf("Product_ID------------->%s\n", msg2);
-            //      printf("Product_type----------->%s\n", msg3);
-                
-                //count++;
-
-                void *p=malloc(10*sizeof(product));
-                read(warehouses[i],p,10*sizeof(product));
-
-                prd[0]=*((product*)p);
-                printf("Provider--------------->%s\n", prd->provider_id);
-                printf("Product_ID------------->%d\n", prd->product_id);
-                printf("Product_type----------->%s\n", prd->product_type);
+                printf("%s\n",msg );
+                product prd[1];
+                read(warehouses[i],prd,sizeof(product));
+                printf("Provider--------------->%s\n", prd[0].provider_id);
+                printf("Product_ID------------->%d\n", prd[0].product_id);
+                printf("Product_type----------->%s\n", prd[0].product_type);
                 
                 count++;
             }
         }
         
-        v(&warehouses_mutex[i]);
+        v(&warehouses_mutex);
 
     }
 }

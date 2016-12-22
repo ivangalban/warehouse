@@ -62,8 +62,11 @@ void init(int argc ,char **argv)
         {
             sem_init(&warehouses_mutex[index],0,1);
             warehouses[index]=open_clientfd(tmp_str,tmp_int);            
-            char *buff="producer\0";
-            write(warehouses[index],buff,strlen(buff));
+            char buff[10];
+           
+            sprintf(buff,"producer\0");
+         
+            write(warehouses[index],buff,10);
             ++index;
         }
     }
@@ -123,7 +126,7 @@ void *produce_item(void *vargp)
     }
 }
 
-void *produce1(void *vargp) /*tmp*/
+void *produce(void *vargp) /*tmp*/
 {
     while(1)
     {
@@ -143,30 +146,11 @@ void *produce1(void *vargp) /*tmp*/
     }
 }
 
-void *produce2(void *vargp) /*tmp*/
-{
-    pthread_t *id=(pthread_t*)malloc(total_products*sizeof(pthread_t));
-    for (int i = 0; i < total_products; ++i)
-    {
-        int *item=(int*)malloc(sizeof(int));
-        *item=i;
-        pthread_create(&id[i],NULL,produce_item, item);
-    }
-    for (int i = 0; i < total_products; ++i)
-    {
-        pthread_join(id[i],NULL);
-    }
-}
- 
-void *produce(void *vargp)
-{
-    produce1(vargp);
-}
 
 void *store_item(void *vargp)
 {
     int item=*((int*)vargp);
-    char msg[5];
+    char msg[10];
     for (int i = 0; ; ++i)
     {
     
@@ -177,9 +161,10 @@ void *store_item(void *vargp)
 
         if((warehouses[i]!=-1)&&(getpeername(warehouses[i],(SA *)&clientaddr, &clientlen)!=-1))
         {
-            write(warehouses[i],production[item].type,strlen(production[item].type));
-            read(warehouses[i],msg,5);
-            if(strncmp(msg,"OK",2)==0)
+            sprintf(msg,"%s\0",production[item].type);
+            write(warehouses[i],msg,10);
+            read(warehouses[i],msg,10);
+            if(strcmp(msg,"OK\0")==0)
             {
                 sprintf(production[item].products[production[item].current].provider_id,"%s",producer_id);
                 write(warehouses[i],&production[item].products[production[item].current],sizeof(product));

@@ -6,7 +6,7 @@ product *buffer;
 sem_t buffer_mutex;
 int product_types_size;
 int id_producer=1;
-
+int accept_auto=0;
 void print_status()
 {
 
@@ -43,6 +43,7 @@ void init(int argc ,char **argv)
 
     if(strchr(argv[2],':')==NULL)
     {
+        accept_auto=1;
         limit=atoi(argv[2]);
         index++;
     }
@@ -78,7 +79,7 @@ void init(int argc ,char **argv)
 
     buffer=(product*)malloc(limit*sizeof(product));
 
-    product_types[0].type=(char*)malloc(5*sizeof(char));
+    product_types[0].type=(char*)malloc(10*sizeof(char));
    
     //printf("%d\n",limit );
 
@@ -104,21 +105,20 @@ void *thread(void *vargp)
    
     char buff[10];
 
-    read(connfd, buff, sizeof(buff)); 
-    if(strncmp("producer",buff,8)==0)
+    read(connfd, buff, 10); 
+    if(strcmp("producer\0",buff)==0)
         producer_service(connfd);
-    else if(strncmp("consumer",buff,8)==0)
+    else if(strcmp("consumer\0",buff)==0)
         consumer_service(connfd);
-        printf("asdasdsd\n");
     close(connfd);
     return NULL;
 }
-char okmessage[6]="OK\0";
-char nomessage[6]="NO\0";
+char okmessage[10]="OK\0";
+char nomessage[10]="NO\0";
 
 void producer_service(int connfd)
 {
-    char buff[5];
+    char buff[10];
 
     struct sockaddr_in clientaddr;
     
@@ -126,14 +126,8 @@ void producer_service(int connfd)
     
     while(1)
     {
-        for (int i = 0; i < 5; ++i)
-        {
-            buff[i]=0;
-        }
         
-        
-        
-        read(connfd,buff,5); 
+        read(connfd,buff,10);
 
         int count=1;
        
@@ -145,28 +139,33 @@ void producer_service(int connfd)
         int index_product;
 
         for(index_type=product_types_size-1; index_type>0;--index_type)
-            if(strncmp(buff,product_types[index_type].type,3)==0)
+            if(strcmp(buff,product_types[index_type].type)==0)
                 break;
-         
+
         if(index_type!=0)
         {
-            sem_getvalue(&product_types[index_type].slots_available,&count); 
+            sem_getvalue(&product_types[index_type].slots_available,&count);
         }  
 
         sem_getvalue(&product_types[0].slots_available,&limit_count);
                
-        if(count > 0 && limit_count>0)
+        if(count > 0 && limit_count>0 && (accept_auto||index_type>0))
         {
-            write(connfd,okmessage,strlen(okmessage)+1);
+            // printf("!!!!!!!!%d  %d\n",index_type,product_types_size ); 
+            // printf("%s  %s\n",buff,product_types[0].type );
+            // printf("%s  %s\n",buff,product_types[1].type );
+
+            write(connfd,okmessage,10);
 
             for (index_product = 0; index_product < limit; ++index_product)
             {
                 if(buffer[index_product].product_id==-1)
                     break;
             }
-
+            
             read(connfd,&buffer[index_product],sizeof(product));
             
+
             if(index_type!=0)
             {
                 p(&product_types[index_type].slots_available);
@@ -176,11 +175,13 @@ void producer_service(int connfd)
             p(&product_types[0].slots_available);
             v(&product_types[0].slots_busy);
              print_status();
-            printf("in\n");
+             printf("in\n");
 
         }    
         else
-            write(connfd,nomessage,strlen(nomessage)+1);
+        {
+            write(connfd,nomessage,10);
+        }
         
         v(&buffer_mutex);
     }
@@ -188,7 +189,7 @@ void producer_service(int connfd)
 
 void consumer_service(int connfd)
 {
-   char buff[5];
+   char buff[10];
 
     struct sockaddr_in clientaddr;
     
@@ -197,24 +198,19 @@ void consumer_service(int connfd)
     while(1)
     {
 
-        for (int i = 0; i < 5; ++i)
-        {
-            buff[i]=0;
-        }
+        read(connfd,buff,10); 
         
         int count=1;
        
         int limit_count=1;
-        
-        read(connfd,buff,5); 
-        
+
         p(&buffer_mutex);
       
         int index_type;
         int index_product;
 
         for(index_type=product_types_size-1; index_type>0;--index_type)
-            if(strncmp(buff,product_types[index_type].type,3)==0)
+            if(strcmp(buff,product_types[index_type].type)==0)
                 break;
          
         if(index_type!=0)
@@ -223,19 +219,17 @@ void consumer_service(int connfd)
         }  
 
         sem_getvalue(&product_types[0].slots_busy,&limit_count);
-               
-        if(count > 0 && limit_count>0)
-        {
-            write(connfd,okmessage,strlen(okmessage)+1);
+        int is_auto=(strcmp(buff,"auto\0")==0);  
 
-            int is_auto=strncmp(buff,"auto",4);
+        if(count > 0 && limit_count>0 && (is_auto||index_type>0))
+        {
+            write(connfd,okmessage,10);
             for (index_product = 0; index_product < limit; ++index_product)
             {
                 if(buffer[index_product].product_id!=-1 && 
-                    (is_auto || strncmp(buff,buffer[index_product].product_type,3)))
+                    (is_auto || strcmp(buff,buffer[index_product].product_type)))
                     break;
             }
-
             write(connfd,&buffer[index_product],sizeof(product));
             buffer[index_product].product_id=-1;
             if(index_type!=0)
@@ -249,10 +243,12 @@ void consumer_service(int connfd)
             
             print_status();
             printf("out\n");
-            
+
         }    
         else
-            write(connfd,nomessage,strlen(nomessage)+1);
+        {
+            write(connfd,nomessage,10);
+        }
         
         v(&buffer_mutex);
     }

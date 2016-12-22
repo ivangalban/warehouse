@@ -123,9 +123,12 @@ void *receive_item(void *vargp)
                 //count++;
 
                 void *p=malloc(10*sizeof(product));
+                char s[20];
+                read(warehouses[i],s,10*sizeof(char));
                 read(warehouses[i],p,10*sizeof(product));
 
                 prd[0]=*((product*)p);
+                printf("%s\n",s );
                 printf("Provider--------------->%s\n", prd->provider_id);
                 printf("Product_ID------------->%d\n", prd->product_id);
                printf("Product_type----------->%s\n", prd->product_type);

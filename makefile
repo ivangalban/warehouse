@@ -1,5 +1,3 @@
-#git commit -m "" --author="Ivan Galban Smith <i.galban@lab.matcom.uh.cu>"
-
 .SUFFIXES:
 
 .SUFFIXES: .c .o
